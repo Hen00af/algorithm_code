@@ -160,46 +160,57 @@ class MyAI(Alg3D):
         # -------------------------
         def evaluate_side(p: int) -> int:
             score = 0
-            # 直線4マスの評価（x,y,z と 3D斜め）
             for z in range(BOARD_SIZE_Z):
                 for y in range(BOARD_SIZE_Y):
                     for x in range(BOARD_SIZE_X):
                         # x方向
                         if x <= BOARD_SIZE_X - 4:
-                            line = [cell(z, y, x + i) for i in range(4)]
-                            c = line.count(p)
-                            e = line.count(0)
+                            line = [cell(z, y, x+i) for i in range(4)]
+                            c, e = line.count(p), line.count(0)
                             if c == 4: return 10000
                             if c == 3 and e == 1: score += 80
                             elif c == 2 and e == 2: score += 15
                         # y方向
                         if y <= BOARD_SIZE_Y - 4:
-                            line = [cell(z, y + i, x) for i in range(4)]
-                            c = line.count(p); e = line.count(0)
+                            line = [cell(z, y+i, x) for i in range(4)]
+                            c, e = line.count(p), line.count(0)
                             if c == 4: return 10000
                             if c == 3 and e == 1: score += 80
                             elif c == 2 and e == 2: score += 15
                         # z方向
                         if z <= BOARD_SIZE_Z - 4:
-                            line = [cell(z + i, y, x) for i in range(4)]
-                            c = line.count(p); e = line.count(0)
+                            line = [cell(z+i, y, x) for i in range(4)]
+                            c, e = line.count(p), line.count(0)
                             if c == 4: return 10000
                             if c == 3 and e == 1: score += 80
                             elif c == 2 and e == 2: score += 15
                         # 3D斜め（↘↘↘）
                         if x <= BOARD_SIZE_X - 4 and y <= BOARD_SIZE_Y - 4 and z <= BOARD_SIZE_Z - 4:
-                            line = [cell(z + i, y + i, x + i) for i in range(4)]
-                            c = line.count(p); e = line.count(0)
+                            line = [cell(z+i, y+i, x+i) for i in range(4)]
+                            c, e = line.count(p), line.count(0)
                             if c == 4: return 10000
                             if c == 3 and e == 1: score += 80
                             elif c == 2 and e == 2: score += 15
-            # 中央ボーナス
-            for z in range(BOARD_SIZE_Z):
-                for y in range(BOARD_SIZE_Y):
-                    for x in range(BOARD_SIZE_X):
-                        if cell(z, y, x) == p:
-                            score += (2 - abs(x - 1.5)) + (2 - abs(y - 1.5))
-            return int(score)
+                        # 他の対角線方向も評価
+                        if x >= 3 and y <= BOARD_SIZE_Y - 4 and z <= BOARD_SIZE_Z - 4:
+                            line = [cell(z+i, y+i, x-i) for i in range(4)]
+                            c, e = line.count(p), line.count(0)
+                            if c == 4: return 10000
+                            if c == 3 and e == 1: score += 80
+                            elif c == 2 and e == 2: score += 15
+                        if x <= BOARD_SIZE_X - 4 and y >= 3 and z <= BOARD_SIZE_Z - 4:
+                            line = [cell(z+i, y-i, x+i) for i in range(4)]
+                            c, e = line.count(p), line.count(0)
+                            if c == 4: return 10000
+                            if c == 3 and e == 1: score += 80
+                            elif c == 2 and e == 2: score += 15
+                        if x >= 3 and y >= 3 and z <= BOARD_SIZE_Z - 4:
+                            line = [cell(z+i, y-i, x-i) for i in range(4)]
+                            c, e = line.count(p), line.count(0)
+                            if c == 4: return 10000
+                            if c == 3 and e == 1: score += 80
+                            elif c == 2 and e == 2: score += 15
+            return score
 
         def evaluate() -> int:
             # 自分 − 相手（相手3連は強減点を間接的に表現）
@@ -231,7 +242,6 @@ class MyAI(Alg3D):
                             if line.count(opponent) == 3 and line.count(0) == 1:
                                 penalty += 120
             return me - opp - penalty
-
         # -------------------------
         # 8) Minimax + αβ（動的順序）
         # -------------------------
