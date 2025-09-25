@@ -21,12 +21,12 @@ class MyAI(Alg3D):
             for y in range(BOARD_SIZE_Y)
             for x in range(BOARD_SIZE_X)
         )
-        if empty_count > 10:
-            MAX_DEPTH = 3   # 序盤
-        elif empty_count > 5:
-            MAX_DEPTH = 4   # 中盤
+        if empty_count > 20:
+            MAX_DEPTH = 4   # 序盤は少し控えめ
+        elif empty_count > 10:
+            MAX_DEPTH = 5   # 中盤は深く
         else:
-            MAX_DEPTH = 5   # 終盤じっくり
+            MAX_DEPTH = 6   # 終盤は全力探索
 
         # ---- 中央優先順序を生成 ----
         def center_priority_order():
@@ -34,11 +34,7 @@ class MyAI(Alg3D):
             ys = list(range(BOARD_SIZE_Y))
             xs_sorted = sorted(xs, key=lambda i: (abs(i - 1.5), i))
             ys_sorted = sorted(ys, key=lambda j: (abs(j - 1.5), j))
-            order = []
-            for y in ys_sorted:
-                for x in xs_sorted:
-                    order.append((x, y))
-            return order
+            return [(x, y) for y in ys_sorted for x in xs_sorted]
 
         order = center_priority_order()
 
@@ -92,6 +88,7 @@ class MyAI(Alg3D):
                 elif line.count(p) == 2 and line.count(0) == 2:
                     score += 10
 
+            # 中央寄りボーナス
             for z in range(BOARD_SIZE_Z):
                 for y in range(BOARD_SIZE_Y):
                     for x in range(BOARD_SIZE_X):
@@ -107,7 +104,7 @@ class MyAI(Alg3D):
                 return evaluate(state, player) - evaluate(state, opponent)
 
             best_value = -inf if maximizing else inf
-            for x, y in order:  # 中央寄りから探索
+            for x, y in order:  # 中央優先探索
                 if column_has_space(x, y):
                     make_move(state, x, y, current_player)
                     value = minimax(state, depth - 1, alpha, beta, not maximizing)
@@ -121,7 +118,7 @@ class MyAI(Alg3D):
                         beta = min(beta, value)
 
                     if beta <= alpha:
-                        return best_value
+                        return best_value  # 枝刈りで早期終了
             return best_value
 
         # ---- 実際の手を選ぶ ----
