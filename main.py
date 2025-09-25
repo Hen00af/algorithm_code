@@ -48,7 +48,7 @@ class MyAI(Alg3D):
 
         # サーバ仕様は x,y ∈ [0..3]
         BOARD_SIZE_X, BOARD_SIZE_Y = 4, 4
-        BOARD_SIZE_Z = Z if Z > 0 else 4  # 万一0でも落ちないように
+        BOARD_SIZE_Z = Z 
 
         # -------------------------
         # 3) セルアクセス（範囲外は埋まり扱い）
