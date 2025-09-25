@@ -1,4 +1,3 @@
-
 #※変更禁止※
 #ターミナルでpython local_driver.pyと打つと次の手をかえしてくれる。
 # === local_driver.py ===
