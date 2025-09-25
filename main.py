@@ -22,11 +22,11 @@ class MyAI(Alg3D):
             for x in range(BOARD_SIZE_X)
         )
         if empty_count > 20:
-            MAX_DEPTH = 4   # 序盤は少し控えめ
+            MAX_DEPTH = 4
         elif empty_count > 10:
-            MAX_DEPTH = 5   # 中盤は深く
+            MAX_DEPTH = 5
         else:
-            MAX_DEPTH = 6   # 終盤は全力探索
+            MAX_DEPTH = 6  # 終盤は全力探索
 
         # ---- 中央優先順序を生成 ----
         def center_priority_order():
@@ -55,14 +55,42 @@ class MyAI(Alg3D):
             z = get_lowest_empty_z(x, y)
             if z is not None:
                 state[z][y][x] = p
-                return True
-            return False
+                return z
+            return None
 
         def undo_move(state, x, y):
             for z in reversed(range(BOARD_SIZE_Z)):
                 if state[z][y][x] != 0:
                     state[z][y][x] = 0
                     return
+
+        # ---- 勝ち判定 ----
+        def is_winning_move(state, x, y, z, p):
+            """(x,y,z) に p を置いた状態で4連ができているか"""
+            directions = [
+                (1, 0, 0), (0, 1, 0), (0, 0, 1),
+                (1, 1, 0), (1, 0, 1), (0, 1, 1),
+                (1, 1, 1), (1, -1, 0), (1, 0, -1), (0, 1, -1),
+                (1, -1, -1), (1, 1, -1), (1, -1, 1)
+            ]
+            for dx, dy, dz in directions:
+                count = 1
+                for step in (1, -1):
+                    nx, ny, nz = x, y, z
+                    while True:
+                        nx += dx * step
+                        ny += dy * step
+                        nz += dz * step
+                        if 0 <= nx < BOARD_SIZE_X and 0 <= ny < BOARD_SIZE_Y and 0 <= nz < BOARD_SIZE_Z:
+                            if state[nz][ny][nx] == p:
+                                count += 1
+                            else:
+                                break
+                        else:
+                            break
+                if count >= 4:
+                    return True
+            return False
 
         # ---- 評価関数 ----
         def evaluate(state, p):
@@ -84,9 +112,15 @@ class MyAI(Alg3D):
                 if line.count(p) == 4:
                     return 10000
                 elif line.count(p) == 3 and line.count(0) == 1:
-                    score += 50
+                    score += 80  # 3連は強めに
                 elif line.count(p) == 2 and line.count(0) == 2:
-                    score += 10
+                    score += 15
+
+            # 相手の3連を強く減点
+            opp = opponent if p == player else player
+            for line in lines:
+                if line.count(opp) == 3 and line.count(0) == 1:
+                    score -= 120
 
             # 中央寄りボーナス
             for z in range(BOARD_SIZE_Z):
@@ -104,24 +138,51 @@ class MyAI(Alg3D):
                 return evaluate(state, player) - evaluate(state, opponent)
 
             best_value = -inf if maximizing else inf
-            for x, y in order:  # 中央優先探索
+            # 探索順をスコア順に動的ソート
+            candidates = []
+            for x, y in order:
                 if column_has_space(x, y):
-                    make_move(state, x, y, current_player)
-                    value = minimax(state, depth - 1, alpha, beta, not maximizing)
+                    z = make_move(state, x, y, current_player)
+                    score = evaluate(state, current_player)
                     undo_move(state, x, y)
+                    candidates.append((score, x, y))
+            candidates.sort(reverse=maximizing)
 
-                    if maximizing:
-                        best_value = max(best_value, value)
-                        alpha = max(alpha, value)
-                    else:
-                        best_value = min(best_value, value)
-                        beta = min(beta, value)
+            for _, x, y in candidates:
+                z = make_move(state, x, y, current_player)
+                value = minimax(state, depth - 1, alpha, beta, not maximizing)
+                undo_move(state, x, y)
 
-                    if beta <= alpha:
-                        return best_value  # 枝刈りで早期終了
+                if maximizing:
+                    best_value = max(best_value, value)
+                    alpha = max(alpha, value)
+                else:
+                    best_value = min(best_value, value)
+                    beta = min(beta, value)
+
+                if beta <= alpha:
+                    return best_value  # 枝刈り
             return best_value
 
-        # ---- 実際の手を選ぶ ----
+        # ---- 1. 勝ち手チェック ----
+        for x, y in order:
+            if column_has_space(x, y):
+                z = make_move(board, x, y, player)
+                if is_winning_move(board, x, y, z, player):
+                    undo_move(board, x, y)
+                    return (x, y)
+                undo_move(board, x, y)
+
+        # ---- 2. ブロック手チェック ----
+        for x, y in order:
+            if column_has_space(x, y):
+                z = make_move(board, x, y, opponent)
+                if is_winning_move(board, x, y, z, opponent):
+                    undo_move(board, x, y)
+                    return (x, y)
+                undo_move(board, x, y)
+
+        # ---- 3. Minimax 探索 ----
         best_score = -inf
         best_move = (0, 0)
         for x, y in order:
