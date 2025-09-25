@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from math import inf
 # from local_driver import Alg3D, Board  # ローカル検証用
 from framework import Alg3D, Board      # 本番用
@@ -7,74 +7,137 @@ from framework import Alg3D, Board      # 本番用
 class MyAI(Alg3D):
     def get_move(
         self,
-        board: List[List[List[int]]],
+        board,  # Board でも List[List[List[int]]] でもOKにする
         player: int,
         last_move: Tuple[int, int, int]
     ) -> Tuple[int, int]:
-        BOARD_SIZE_X, BOARD_SIZE_Y, BOARD_SIZE_Z = 4, 4, len(board)
+        # -------------------------
+        # 1) Board を生配列に正規化
+        # -------------------------
+        def as_array(b) -> List[List[List[int]]]:
+            if isinstance(b, list):
+                return b
+            # よくある内部フィールド名を順に探す
+            for attr in ("grid", "state", "board", "cells", "data"):
+                v = getattr(b, attr, None)
+                if isinstance(v, list):
+                    return v
+            # to_list() を持っていれば使う
+            if hasattr(b, "to_list"):
+                v = b.to_list()
+                if isinstance(v, list):
+                    return v
+            # ここまで来たら仕様外
+            raise TypeError("Unsupported Board type: expected 3D list or Board-like object")
+
+        B = as_array(board)
+
+        # -------------------------
+        # 2) 形状を安全に取得
+        #    想定は [z][y][x]（z:高さ, y:行, x:列）
+        # -------------------------
+        def safe_len(a) -> int:
+            try:
+                return len(a)
+            except Exception:
+                return 0
+
+        Z = safe_len(B)
+        Y = safe_len(B[0]) if Z > 0 else 0
+        X = safe_len(B[0][0]) if Y > 0 else 0
+
+        # サーバ仕様は x,y ∈ [0..3]
+        BOARD_SIZE_X, BOARD_SIZE_Y = 4, 4
+        BOARD_SIZE_Z = Z if Z > 0 else 4  # 万一0でも落ちないように
+
+        # -------------------------
+        # 3) セルアクセス（範囲外は埋まり扱い）
+        # -------------------------
+        def cell(z: int, y: int, x: int) -> int:
+            if 0 <= z < Z and 0 <= y < Y and 0 <= x < X:
+                try:
+                    return B[z][y][x]
+                except Exception:
+                    return 1
+            return 1
+
+        def column_has_space(x: int, y: int) -> bool:
+            for z in range(BOARD_SIZE_Z):
+                if cell(z, y, x) == 0:
+                    return True
+            return False
+
+        def lowest_empty_z(x: int, y: int) -> Optional[int]:
+            for z in range(BOARD_SIZE_Z):
+                if cell(z, y, x) == 0:
+                    return z
+            return None
+
+        def make_move(x: int, y: int, p: int) -> Optional[int]:
+            z = lowest_empty_z(x, y)
+            if z is not None:
+                # B が十分な深さ/幅を持たない場合に備えて try
+                try:
+                    B[z][y][x] = p
+                    return z
+                except Exception:
+                    return None
+            return None
+
+        def undo_move(x: int, y: int) -> None:
+            # 最上段から1つ戻す（積み上げ前提）
+            for z in range(BOARD_SIZE_Z - 1, -1, -1):
+                if cell(z, y, x) != 0:
+                    try:
+                        B[z][y][x] = 0
+                    except Exception:
+                        pass
+                    return
+
+        # -------------------------
+        # 4) 探索順（中央優先）
+        # -------------------------
+        def center_order():
+            xs = list(range(BOARD_SIZE_X))
+            ys = list(range(BOARD_SIZE_Y))
+            xs = sorted(xs, key=lambda i: (abs(i - 1.5), i))
+            ys = sorted(ys, key=lambda j: (abs(j - 1.5), j))
+            return [(x, y) for y in ys for x in xs]
+
+        order = center_order()
         opponent = 2 if player == 1 else 1
 
-        # --- 空きマス数を数えて深さを可変に ---
-        empty_count = sum(
-            board[z][y][x] == 0
-            for z in range(BOARD_SIZE_Z)
-            for y in range(BOARD_SIZE_Y)
-            for x in range(BOARD_SIZE_X)
-        )
+        # -------------------------
+        # 5) 深さ（より強固・終盤6）
+        # -------------------------
+        empty_count = 0
+        for z in range(BOARD_SIZE_Z):
+            for y in range(BOARD_SIZE_Y):
+                for x in range(BOARD_SIZE_X):
+                    empty_count += (cell(z, y, x) == 0)
+
         if empty_count > 20:
             MAX_DEPTH = 4
         elif empty_count > 10:
             MAX_DEPTH = 5
         else:
-            MAX_DEPTH = 6  # 終盤は全力探索
+            MAX_DEPTH = 6
 
-        # ---- 中央優先順序を生成 ----
-        def center_priority_order():
-            xs = list(range(BOARD_SIZE_X))
-            ys = list(range(BOARD_SIZE_Y))
-            xs_sorted = sorted(xs, key=lambda i: (abs(i - 1.5), i))
-            ys_sorted = sorted(ys, key=lambda j: (abs(j - 1.5), j))
-            return [(x, y) for y in ys_sorted for x in xs_sorted]
+        # -------------------------
+        # 6) 勝ち判定（置いた直後の1点で判定）
+        # -------------------------
+        DIRS = [
+            (1, 0, 0), (0, 1, 0), (0, 0, 1),
+            (1, 1, 0), (1, 0, 1), (0, 1, 1),
+            (1, 1, 1), (1, -1, 0), (1, 0, -1), (0, 1, -1),
+            (1, -1, -1), (1, 1, -1), (1, -1, 1)
+        ]
 
-        order = center_priority_order()
-
-        # ---- 盤面ユーティリティ ----
-        def column_has_space(x, y):
-            for z in range(BOARD_SIZE_Z):
-                if board[z][y][x] == 0:
-                    return True
-            return False
-
-        def get_lowest_empty_z(x, y):
-            for z in range(BOARD_SIZE_Z):
-                if board[z][y][x] == 0:
-                    return z
-            return None
-
-        def make_move(state, x, y, p):
-            z = get_lowest_empty_z(x, y)
-            if z is not None:
-                state[z][y][x] = p
-                return z
-            return None
-
-        def undo_move(state, x, y):
-            for z in reversed(range(BOARD_SIZE_Z)):
-                if state[z][y][x] != 0:
-                    state[z][y][x] = 0
-                    return
-
-        # ---- 勝ち判定 ----
-        def is_winning_move(state, x, y, z, p):
-            """(x,y,z) に p を置いた状態で4連ができているか"""
-            directions = [
-                (1, 0, 0), (0, 1, 0), (0, 0, 1),
-                (1, 1, 0), (1, 0, 1), (0, 1, 1),
-                (1, 1, 1), (1, -1, 0), (1, 0, -1), (0, 1, -1),
-                (1, -1, -1), (1, 1, -1), (1, -1, 1)
-            ]
-            for dx, dy, dz in directions:
-                count = 1
+        def is_winning_after(x: int, y: int, z: int, p: int) -> bool:
+            if z is None:
+                return False
+            for dx, dy, dz in DIRS:
+                cnt = 1
                 for step in (1, -1):
                     nx, ny, nz = x, y, z
                     while True:
@@ -82,114 +145,168 @@ class MyAI(Alg3D):
                         ny += dy * step
                         nz += dz * step
                         if 0 <= nx < BOARD_SIZE_X and 0 <= ny < BOARD_SIZE_Y and 0 <= nz < BOARD_SIZE_Z:
-                            if state[nz][ny][nx] == p:
-                                count += 1
+                            if cell(nz, ny, nx) == p:
+                                cnt += 1
                             else:
                                 break
                         else:
                             break
-                if count >= 4:
+                if cnt >= 4:
                     return True
             return False
 
-        # ---- 評価関数 ----
-        def evaluate(state, p):
+        # -------------------------
+        # 7) 評価関数（強化版）
+        # -------------------------
+        def evaluate_side(p: int) -> int:
             score = 0
-            lines = []
+            # 直線4マスの評価（x,y,z と 3D斜め）
+            for z in range(BOARD_SIZE_Z):
+                for y in range(BOARD_SIZE_Y):
+                    for x in range(BOARD_SIZE_X):
+                        # x方向
+                        if x <= BOARD_SIZE_X - 4:
+                            line = [cell(z, y, x + i) for i in range(4)]
+                            c = line.count(p)
+                            e = line.count(0)
+                            if c == 4: return 10000
+                            if c == 3 and e == 1: score += 80
+                            elif c == 2 and e == 2: score += 15
+                        # y方向
+                        if y <= BOARD_SIZE_Y - 4:
+                            line = [cell(z, y + i, x) for i in range(4)]
+                            c = line.count(p); e = line.count(0)
+                            if c == 4: return 10000
+                            if c == 3 and e == 1: score += 80
+                            elif c == 2 and e == 2: score += 15
+                        # z方向
+                        if z <= BOARD_SIZE_Z - 4:
+                            line = [cell(z + i, y, x) for i in range(4)]
+                            c = line.count(p); e = line.count(0)
+                            if c == 4: return 10000
+                            if c == 3 and e == 1: score += 80
+                            elif c == 2 and e == 2: score += 15
+                        # 3D斜め（↘↘↘）
+                        if x <= BOARD_SIZE_X - 4 and y <= BOARD_SIZE_Y - 4 and z <= BOARD_SIZE_Z - 4:
+                            line = [cell(z + i, y + i, x + i) for i in range(4)]
+                            c = line.count(p); e = line.count(0)
+                            if c == 4: return 10000
+                            if c == 3 and e == 1: score += 80
+                            elif c == 2 and e == 2: score += 15
+            # 中央ボーナス
+            for z in range(BOARD_SIZE_Z):
+                for y in range(BOARD_SIZE_Y):
+                    for x in range(BOARD_SIZE_X):
+                        if cell(z, y, x) == p:
+                            score += (2 - abs(x - 1.5)) + (2 - abs(y - 1.5))
+            return int(score)
+
+        def evaluate() -> int:
+            # 自分 − 相手（相手3連は強減点を間接的に表現）
+            me = evaluate_side(player)
+            if me >= 10000:
+                return 10000
+            opp = evaluate_side(opponent)
+            if opp >= 10000:
+                return -10000
+            # 相手の3連を追加で強く嫌う（近似ペナルティ）
+            penalty = 0
             for z in range(BOARD_SIZE_Z):
                 for y in range(BOARD_SIZE_Y):
                     for x in range(BOARD_SIZE_X):
                         if x <= BOARD_SIZE_X - 4:
-                            lines.append([state[z][y][x+i] for i in range(4)])
+                            line = [cell(z, y, x + i) for i in range(4)]
+                            if line.count(opponent) == 3 and line.count(0) == 1:
+                                penalty += 120
                         if y <= BOARD_SIZE_Y - 4:
-                            lines.append([state[z][y+i][x] for i in range(4)])
+                            line = [cell(z, y + i, x) for i in range(4)]
+                            if line.count(opponent) == 3 and line.count(0) == 1:
+                                penalty += 120
                         if z <= BOARD_SIZE_Z - 4:
-                            lines.append([state[z+i][y][x] for i in range(4)])
+                            line = [cell(z + i, y, x) for i in range(4)]
+                            if line.count(opponent) == 3 and line.count(0) == 1:
+                                penalty += 120
                         if x <= BOARD_SIZE_X - 4 and y <= BOARD_SIZE_Y - 4 and z <= BOARD_SIZE_Z - 4:
-                            lines.append([state[z+i][y+i][x+i] for i in range(4)])
+                            line = [cell(z + i, y + i, x + i) for i in range(4)]
+                            if line.count(opponent) == 3 and line.count(0) == 1:
+                                penalty += 120
+            return me - opp - penalty
 
-            for line in lines:
-                if line.count(p) == 4:
-                    return 10000
-                elif line.count(p) == 3 and line.count(0) == 1:
-                    score += 80  # 3連は強めに
-                elif line.count(p) == 2 and line.count(0) == 2:
-                    score += 15
-
-            # 相手の3連を強く減点
-            opp = opponent if p == player else player
-            for line in lines:
-                if line.count(opp) == 3 and line.count(0) == 1:
-                    score -= 120
-
-            # 中央寄りボーナス
-            for z in range(BOARD_SIZE_Z):
-                for y in range(BOARD_SIZE_Y):
-                    for x in range(BOARD_SIZE_X):
-                        if state[z][y][x] == p:
-                            score += (2 - abs(x - 1.5)) + (2 - abs(y - 1.5))
-
-            return score
-
-        # ---- Minimax + αβ枝刈り ----
-        def minimax(state, depth, alpha, beta, maximizing):
-            current_player = player if maximizing else opponent
+        # -------------------------
+        # 8) Minimax + αβ（動的順序）
+        # -------------------------
+        def minimax(depth: int, alpha: int, beta: int, maximizing: bool) -> int:
             if depth == 0:
-                return evaluate(state, player) - evaluate(state, opponent)
+                return evaluate()
 
-            best_value = -inf if maximizing else inf
-            # 探索順をスコア順に動的ソート
+            current = player if maximizing else opponent
+
+            # 候補手を評価順に並べ替え（中央寄り + 簡易スコア）
             candidates = []
             for x, y in order:
                 if column_has_space(x, y):
-                    z = make_move(state, x, y, current_player)
-                    score = evaluate(state, current_player)
-                    undo_move(state, x, y)
-                    candidates.append((score, x, y))
+                    z = make_move(x, y, current)
+                    if z is None:
+                        continue
+                    val = evaluate()
+                    undo_move(x, y)
+                    candidates.append((val, x, y))
             candidates.sort(reverse=maximizing)
 
+            best = -inf if maximizing else inf
             for _, x, y in candidates:
-                z = make_move(state, x, y, current_player)
-                value = minimax(state, depth - 1, alpha, beta, not maximizing)
-                undo_move(state, x, y)
+                z = make_move(x, y, current)
+                if z is None:
+                    continue
+                val = minimax(depth - 1, alpha, beta, not maximizing)
+                undo_move(x, y)
 
                 if maximizing:
-                    best_value = max(best_value, value)
-                    alpha = max(alpha, value)
+                    if val > best:
+                        best = val
+                    if val > alpha:
+                        alpha = val
                 else:
-                    best_value = min(best_value, value)
-                    beta = min(beta, value)
+                    if val < best:
+                        best = val
+                    if val < beta:
+                        beta = val
 
                 if beta <= alpha:
-                    return best_value  # 枝刈り
-            return best_value
+                    break
+            return int(best)
 
-        # ---- 1. 勝ち手チェック ----
+        # -------------------------
+        # 9) まず即勝ち・即ブロック
+        # -------------------------
         for x, y in order:
             if column_has_space(x, y):
-                z = make_move(board, x, y, player)
-                if is_winning_move(board, x, y, z, player):
-                    undo_move(board, x, y)
+                z = make_move(x, y, player)
+                if z is not None and is_winning_after(x, y, z, player):
+                    undo_move(x, y)
                     return (x, y)
-                undo_move(board, x, y)
+                undo_move(x, y)
 
-        # ---- 2. ブロック手チェック ----
         for x, y in order:
             if column_has_space(x, y):
-                z = make_move(board, x, y, opponent)
-                if is_winning_move(board, x, y, z, opponent):
-                    undo_move(board, x, y)
+                z = make_move(x, y, opponent)
+                if z is not None and is_winning_after(x, y, z, opponent):
+                    undo_move(x, y)
                     return (x, y)
-                undo_move(board, x, y)
+                undo_move(x, y)
 
-        # ---- 3. Minimax 探索 ----
+        # -------------------------
+        # 10) Minimax本探索
+        # -------------------------
         best_score = -inf
         best_move = (0, 0)
         for x, y in order:
             if column_has_space(x, y):
-                make_move(board, x, y, player)
-                score = minimax(board, MAX_DEPTH - 1, -inf, inf, False)
-                undo_move(board, x, y)
+                z = make_move(x, y, player)
+                if z is None:
+                    continue
+                score = minimax(MAX_DEPTH - 1, -inf, inf, False)
+                undo_move(x, y)
                 if score > best_score:
                     best_score = score
                     best_move = (x, y)
