@@ -93,14 +93,14 @@ class MyAI:
                 score -= 50
         return score
 
-        def legal_move(self, board):
-            action_arr = []
-            for y in range(4):
-                for x in range(4):
-                    # その列の最上段 z=3 が空いていれば合法
-                    if board[x][y][3] == 0:
-                        action_arr.append((x, y))
-            return action_arr
+    def legal_move(self, board):
+        action_arr = []
+        for y in range(4):
+            for x in range(4):
+                # その列の最上段 z=3 が空いていれば合法
+                if board[x][y][3] == 0:
+                    action_arr.append((x, y))
+        return action_arr
 
     # --- αβ探索 ---
     def alpha_beta_minimax(self, board, isMaximiser, depth, max_depth, alpha, beta, current_player):
