@@ -30,7 +30,7 @@ class MyAI():
             new_board = self.result(board, action)
             if self.is_terminal(new_board) and self.end_value == 1:
                 return (action[1], action[2])
-            current = self.alpha_beta_minimax(new_board, False, 0, 3, alpha=-math.inf, beta=math.inf)
+            current = self.alpha_beta_minimax(new_board, False, 1, 3, alpha=-math.inf, beta=math.inf)
             if current > best_score:
                 best_score = current
                 best_move = (action[1], action[2])
