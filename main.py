@@ -88,7 +88,7 @@ class MyAI:
     def evaluate(self, board):
         end_value, over = self.is_terminal(board)
         if over:
-            return end_value * 100
+            return end_value * 10000  # 終局は最優先
 
         enemy = 1 if self.player == 2 else 2
         score = 0
@@ -96,15 +96,26 @@ class MyAI:
         for line in self.lines:
             values = [board[x][y][z] for (x, y, z) in line]
 
+            # 自分の勝ち筋
             if values.count(self.player) == 3 and values.count(0) == 1:
-                score += 10
+                score += 500
             elif values.count(self.player) == 2 and values.count(0) == 2:
-                score += 1
+                score += 10
 
+            # 相手の勝ち筋
             if values.count(enemy) == 3 and values.count(0) == 1:
                 score -= 1000
             elif values.count(enemy) == 2 and values.count(0) == 2:
-                score -= 10
+                score -= 50
+
+        # --- 中心ボーナス ---
+        center_coords = [(1,1), (1,2), (2,1), (2,2)]
+        for z in range(4):
+            for (cx, cy) in center_coords:
+                if board[cx][cy][z] == self.player:
+                    score += 30   # 中心マスは強く評価
+                elif board[cx][cy][z] == enemy:
+                    score -= 20   # 相手が取ってると不利
 
         return score
 
