@@ -27,22 +27,38 @@ class MyAI:
 
         # --- 序盤の中央優先ルール ---
         occupied = sum(1 for x in range(4) for y in range(4) for z in range(4) if board[x][y][z] != 0)
-        if occupied < 2 and (1,1) in moves:
-            return (1,1)
+        if occupied < 2 and (1, 1) in moves:
+            return (1, 1)
 
+        enemy = 1 if self.player == 2 else 2
+
+        # --- 勝ち手を即決 ---
         for move in moves:
             new_board = self.simulate_move(board, move, self.player)
-
             end_value, over = self.is_terminal(new_board, self.player)
             if over and end_value == 1:
-                return move  # 勝ち手は即決
+                return move
 
-            current = self.alpha_beta_minimax(new_board, False, 1, 3, -math.inf, math.inf, 1 if self.player == 2 else 2)
+        # --- 敵の勝ち手をブロック ---
+        for move in moves:
+            new_board = self.simulate_move(board, move, enemy)
+            end_value, over = self.is_terminal(new_board, enemy)
+            if over and end_value == 1:
+                return move
+
+        # --- αβ探索で評価 ---
+        for move in moves:
+            new_board = self.simulate_move(board, move, self.player)
+            current = self.alpha_beta_minimax(
+                new_board, False, 1, 3, -math.inf, math.inf,
+                enemy
+            )
             if current > best_score:
                 best_score = current
                 best_move = move
 
         return best_move
+
 
     # --- 勝敗判定（指定プレイヤー視点） ---
     def is_terminal(self, board, player):
