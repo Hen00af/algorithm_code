@@ -12,28 +12,30 @@ class MyAI():
         self.player = 0
         self.end_value = 0 # 1 if win -1 if lose 0 if
     
-    def get_move(
-        self,
-        board: List[List[List[int]]], # 盤面情報
-        player: int, # 先手(黒):1 後手(白):2
-        last_move: Tuple[int, int, int] # 直前に置かれた場所(x, y, z)
-    ) -> Tuple[int, int]:
-        # ここにアルゴリズムを書く
+    def get_move(self, board, player, last_move):
         self.player = player
-        # HERE OPTIMISE
-        best_score = 0
-        best_move = (0, 0)
-        print("Legal moves :", self.legal_move(board))
+        best_score = -math.inf
+        best_move = None
+
         for action in self.legal_move(board):
-            print("Action :", action)
-            # if winning move, play it
             new_board = self.result(board, action)
+
             if self.is_terminal(new_board) and self.end_value == 1:
                 return (action[1], action[2])
-            current = self.alpha_beta_minimax(board, False, 0, 3, alpha=-math.inf, beta=math.inf)
+
+            current = self.alpha_beta_minimax(
+                new_board,
+                False,
+                1,  
+                3,
+                alpha=-math.inf,
+                beta=math.inf
+            )
+
             if current > best_score:
                 best_score = current
                 best_move = (action[1], action[2])
+
         return best_move
 
     def result(self, board, action):
@@ -150,10 +152,9 @@ class MyAI():
             for row_i in range(4):
                 print("Row i :", row_i)
                 for space_i in range(4):
-                    if board[plane_i][row_i][space_i] == 0 \
-                        and (3 == plane_i \
-                        or board[plane_i + 1][row_i][space_i] == 0 ):
-
+                    if board[plane_i][row_i][space_i] == 0 and (
+                        plane_i == 0 or board[plane_i - 1][row_i][space_i] != 0
+                    ):
                         action_arr.append((plane_i, row_i, space_i))
         return action_arr
 
@@ -184,6 +185,5 @@ class MyAI():
                 if beta <= alpha:
                     break
             return min_eval
-
 
 
