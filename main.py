@@ -7,12 +7,7 @@ class MyAI:
         self.lines = self.generate_lines()
         self.player = 0
 
-    def get_move(
-        self,
-        board: List[List[List[int]]],
-        player: int,
-        last_move: Tuple[int, int, int]
-    ) -> Tuple[int, int]:
+    def get_move(self, board, player, last_move):
         self.player = player
         best_score = -math.inf
         best_move = (0, 0)
@@ -20,25 +15,21 @@ class MyAI:
         for action in self.legal_move(board):
             new_board = self.result(board, action)
 
-            # 勝てる手は即決
+            # 勝ち筋なら即決
             end_value, over = self.is_terminal(new_board)
             if over and end_value == 1:
-                return (action[1], action[2])
+                return (action[2], action[1])
 
-            current = self.alpha_beta_minimax(
-                new_board,
-                False,
-                1,  # 深さ1から
-                3,
-                alpha=-math.inf,
-                beta=math.inf
-            )
+            # αβ探索
+            current = self.alpha_beta_minimax(new_board, False, 1, 3, -math.inf, math.inf)
+
 
             if current > best_score:
                 best_score = current
-                best_move = (action[1], action[2])
+                best_move = (action[2], action[1])
 
         return best_move
+
 
     def result(self, board, action):
         new_board = copy.deepcopy(board)
