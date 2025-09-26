@@ -111,10 +111,9 @@ class MyAI:
         action_arr = []
         for y in range(4):
             for x in range(4):
-                for z in range(4):
-                    if board[x][y][z] == 0:
-                        action_arr.append((x, y))
-                        break
+                # 列が満杯でなければ追加
+                if board[x][y][3] == 0:
+                    action_arr.append((x, y))
         return action_arr
 
     # --- αβ探索 ---
