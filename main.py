@@ -121,21 +121,21 @@ class MyAI():
 
         if self.over:
             return self.end_value * 100
-		# Heuristic scoring
+        # Heuristic scoring
         for line in self.lines:
-			# Example line : [(0,0,0), (1,1,1), (2,2,2), (3,3,3)]
-			# Example values : [-1, 1, 0, 2]
-            values = [board[x][y][z] for (x,y,z) in line]
-			
+            # Example line : [(0,0,0), (1,1,1), (2,2,2), (3,3,3)]
+            # Example values : [1, 0, 2, 0]
+            values = [board[z][y][x] for (z,y,x) in line]
+            
             if values.count(self.player) == 3 and values.count(0) == 1:
                 score += 10
             elif values.count(self.player) == 2 and values.count(0) == 2:
                 score += 1
 
             if values.count(enemy) == 3 and values.count(0) == 1:
-            	score -= 10
+                score -= 10
             elif values.count(enemy) == 2 and values.count(0) == 2:
-            	score -= 1
+                score -= 1
 
         return score
 
