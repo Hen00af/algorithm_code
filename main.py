@@ -58,16 +58,10 @@ class MyAI:
         return (0, False)
 
     # --- 評価関数（AI視点でスコアリング） ---
-    def evaluate(self, board, player):
-        end_value, over = self.is_terminal(board, player)
+    def evaluate(self, board):
+        end_value, over = self.is_terminal(board, self.player)
         if over:
-            # ゲーム終了時はAIの勝ち/負けを評価
-            if end_value == 1 and player == self.player:
-                return 10000
-            elif end_value == -1 and player != self.player:
-                return 10000
-            else:
-                return -10000
+            return end_value * 10000  # 1=勝ち, -1=負け, 0=引き分け
 
         enemy = 1 if self.player == 2 else 2
         score = 0
@@ -83,16 +77,16 @@ class MyAI:
                 score -= 50
         return score
 
-    # --- 合法手の生成 ---
-    def legal_move(self, board):
-        action_arr = []
-        for y in range(4):
-            for x in range(4):
-                for z in range(4):
-                    if board[x][y][z] == 0:
-                        action_arr.append((x, y))
-                        break  # 1列につき1回だけ追加
-        return action_arr
+        # --- 合法手の生成 ---
+        def legal_move(self, board):
+            action_arr = []
+            for y in range(4):
+                for x in range(4):
+                    for z in range(4):
+                        if board[x][y][z] == 0:
+                            action_arr.append((x, y))
+                            break  # 1列につき1回だけ追加
+            return action_arr
 
     # --- αβ探索 ---
     def alpha_beta_minimax(self, board, isMaximiser, depth, max_depth, alpha, beta, current_player):
