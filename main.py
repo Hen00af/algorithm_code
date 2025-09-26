@@ -1,10 +1,8 @@
-import copy
 from typing import List, Tuple
-from framework import Alg3D, Board # 本番用
-# from local_driver import Alg3D, Board  # ローカル検証用
-#from local_driver import Alg3D, Board # ローカル検証用
+import math
+import copy
 
-class MyAI(Alg3D):
+class MyAI():
     def __init__(self):
         # all possible winning lines
         self.lines = self.generate_lines()
