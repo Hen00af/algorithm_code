@@ -88,7 +88,7 @@ class MyAI:
             elif values.count(self.player) == 2 and values.count(0) == 2:
                 score += 1400
             if values.count(enemy) == 3 and values.count(0) == 1:
-                score -= 2000
+                score -= 2500
             elif values.count(enemy) == 2 and values.count(0) == 2:
                 score -= 1500
         return score
