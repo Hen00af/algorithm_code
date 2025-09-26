@@ -11,25 +11,18 @@ class MyAI:
         self.player = player
         best_score = -math.inf
         best_move = (0, 0)
-
-        for action in self.legal_move(board):
-            new_board = self.result(board, action)
-
-            # 勝ち筋なら即決
+        moves = self.legal_move(board)
+        for move in moves:
+            # zは不要なので result は自分で実装せず、evaluateに直接渡してもOK
+            new_board = self.simulate_move(board, move, self.player)
             end_value, over = self.is_terminal(new_board)
             if over and end_value == 1:
-                return (action[2], action[1])
-
-            # αβ探索
+                return move
             current = self.alpha_beta_minimax(new_board, False, 1, 3, -math.inf, math.inf)
-
-
             if current > best_score:
                 best_score = current
-                best_move = (action[2], action[1])
-
+                best_move = move
         return best_move
-
 
     def result(self, board, action):
         new_board = copy.deepcopy(board)
@@ -84,30 +77,6 @@ class MyAI:
             return (0, True)
 
         return (0, False)
-
-    def get_move(self, board, player, last_move):
-        self.player = player
-        best_score = -math.inf
-        best_move = (0, 0)
-
-        moves = self.legal_move(board)
-
-        for move in moves:
-            # zは不要なので result は自分で実装せず、evaluateに直接渡してもOK
-            new_board = self.simulate_move(board, move, self.player)
-
-            end_value, over = self.is_terminal(new_board)
-            if over and end_value == 1:
-                return move
-
-            current = self.alpha_beta_minimax(new_board, False, 1, 3, -math.inf, math.inf)
-
-            if current > best_score:
-                best_score = current
-                best_move = move
-
-        return best_move
-
 
     def legal_move(self, board):
         """
