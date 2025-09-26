@@ -14,33 +14,68 @@ class MyAI():
         player: int,
         last_move: Tuple[int, int, int]
     ) -> Tuple[int, int]:
-        self.player = player
-        best_score = -math.inf
-        best_move = None
+        try:
+            self.player = player
+            best_score = -math.inf
+            best_move = None
 
-        moves = self.legal_move(board)
-        for action in moves:
-            new_board = self.result(board, action)
+            moves = self.legal_move(board)
+            if not moves:  # 合法手がない場合
+                return (0, 0)
 
-            # 勝ち筋なら即決
-            if self.is_terminal(new_board)[0] == 1:
+            for action in moves:
+                new_board = self.result(board, action)
+
+                # 勝ち筋なら即決
+                if self.is_terminal(new_board)[0] == 1:
+                    return (action[1], action[2])
+
+                # 敵の勝ち筋をブロックする手を検出
+                enemy_player = 1 if self.player == 2 else 2
+                enemy_board = copy.deepcopy(board)
+                enemy_board[action[0]][action[1]][action[2]] = enemy_player
+                original_player = self.player
+                self.player = enemy_player
+                if self.is_terminal(enemy_board)[0] == 1:
+                    self.player = original_player
+                    return (action[1], action[2])  # ブロック手
+                self.player = original_player
+
+                # αβ探索（深度を2に下げて安全性向上）
+                current = self.alpha_beta_minimax(
+                    new_board,
+                    False,   # 次は相手
+                    1,       # 1手目から
+                    2,       # 最大深さを3→2に変更
+                    alpha=-math.inf,
+                    beta=math.inf
+                )
+
+                if current > best_score:
+                    best_score = current
+                    best_move = (action[1], action[2])
+
+            # 安全な手を返す
+            if best_move is not None:
+                # 返す前に座標が有効かダブルチェック
+                y, x = best_move
+                if 0 <= y <= 3 and 0 <= x <= 3:
+                    return best_move
+            
+            if moves:
+                # フォールバック: 最初の合法手
+                action = moves[0]
                 return (action[1], action[2])
-
-            # αβ探索
-            current = self.alpha_beta_minimax(
-                new_board,
-                False,   # 次は相手
-                1,       # 1手目から
-                3,       # 最大深さ
-                alpha=-math.inf,
-                beta=math.inf
-            )
-
-            if current > best_score:
-                best_score = current
-                best_move = (action[1], action[2])
-
-        return best_move if best_move else (0, 0)
+            else:
+                return (0, 0)
+                
+        except Exception as e:
+            # エラー時のフォールバック
+            moves = self.legal_move(board)
+            if moves:
+                action = moves[0]
+                return (action[1], action[2])
+            return (0, 0)
 
     def result(self, board, action):
         new_board = copy.deepcopy(board)
@@ -146,15 +181,13 @@ class MyAI():
 
         if isMaximiser:
             max_eval = -math.inf
-            for action in self.legal_move(board):
-                eval = self.alpha_beta_minimax(
-                    self.result(board, action),
-                    False,
-                    depth + 1,
-                    max_depth,
-                    alpha,
-                    beta
-                )
+            legal_actions = self.legal_move(board)
+            if not legal_actions:
+                return self.evaluate(board)
+            
+            for action in legal_actions:
+                new_board = self.result(board, action)
+                eval = self.alpha_beta_minimax(new_board, False, depth + 1, max_depth, alpha, beta)
                 max_eval = max(max_eval, eval)
                 alpha = max(alpha, eval)
                 if beta <= alpha:
@@ -162,17 +195,27 @@ class MyAI():
             return max_eval
         else:
             min_eval = math.inf
-            for action in self.legal_move(board):
-                eval = self.alpha_beta_minimax(
-                    self.result(board, action),
-                    True,
-                    depth + 1,
-                    max_depth,
-                    alpha,
-                    beta
-                )
+            legal_actions = self.legal_move(board)
+            if not legal_actions:
+                return self.evaluate(board)
+                
+            # 敵のプレイヤーの手をシミュレート
+            enemy_player = 1 if self.player == 2 else 2
+            original_player = self.player
+            
+            for action in legal_actions:
+                # 敵の手を作成
+                new_board = copy.deepcopy(board)
+                new_board[action[0]][action[1]][action[2]] = enemy_player
+                
+                # 一時的に敵プレイヤーに切り替え
+                self.player = enemy_player
+                eval = self.alpha_beta_minimax(new_board, True, depth + 1, max_depth, alpha, beta)
+                self.player = original_player  # プレイヤーを復元
+                
                 min_eval = min(min_eval, eval)
                 beta = min(beta, eval)
                 if beta <= alpha:
                     break
+            
             return min_eval
