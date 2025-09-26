@@ -88,9 +88,9 @@ class MyAI(Alg3D):
         end_value, over = self.is_terminal(board, current_player)
         if over:
             if end_value == 1:  # current_player 勝ち
-                return 1000000 if current_player == self.player else -1000000
+                return 100000000 if current_player == self.player else -1000000
             elif end_value == -1:  # current_player 負け
-                return -1000000 if current_player == self.player else 1000000
+                return -100000000 if current_player == self.player else 1000000
             else:
                 return 0
 
@@ -109,7 +109,7 @@ class MyAI(Alg3D):
 
             # 敵の並び（守り）
             if values.count(enemy) == 3 and values.count(0) == 1:
-                score -= 8000
+                score -= 800000
             elif values.count(enemy) == 2 and values.count(0) == 2:
                 score -= 200
         return score
