@@ -93,16 +93,14 @@ class MyAI:
                 score -= 50
         return score
 
-    # --- 合法手の生成 ---
-    def legal_move(self, board):
-        action_arr = []
-        for y in range(4):
-            for x in range(4):
-                for z in range(4):
-                    if board[x][y][z] == 0:
+        def legal_move(self, board):
+            action_arr = []
+            for y in range(4):
+                for x in range(4):
+                    # その列の最上段 z=3 が空いていれば合法
+                    if board[x][y][3] == 0:
                         action_arr.append((x, y))
-                        break  # 1列につき1回だけ追加
-        return action_arr
+            return action_arr
 
     # --- αβ探索 ---
     def alpha_beta_minimax(self, board, isMaximiser, depth, max_depth, alpha, beta, current_player):
