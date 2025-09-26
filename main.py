@@ -84,13 +84,13 @@ class MyAI:
         for line in self.lines:
             values = [board[x][y][z] for (x,y,z) in line]
             if values.count(self.player) == 3 and values.count(0) == 1:
-                score += 900
+                score += 1900
             elif values.count(self.player) == 2 and values.count(0) == 2:
-                score += 10
+                score += 1400
             if values.count(enemy) == 3 and values.count(0) == 1:
-                score -= 1000
+                score -= 2000
             elif values.count(enemy) == 2 and values.count(0) == 2:
-                score -= 50
+                score -= 1500
         return score
 
     def legal_move(self, board):
