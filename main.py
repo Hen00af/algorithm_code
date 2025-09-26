@@ -17,7 +17,11 @@ class MyAI():
         best_score = -math.inf
         best_move = None
 
-        for action in self.legal_move(board):
+        legal_moves = self.legal_move(board)
+        if not legal_moves:  # No legal moves available
+            return (0, 0)
+
+        for action in legal_moves:
             new_board = self.result(board, action)
 
             if self.is_terminal(new_board) and self.end_value == 1:
@@ -36,7 +40,7 @@ class MyAI():
                 best_score = current
                 best_move = (action[1], action[2])
 
-        return best_move
+        return best_move if best_move is not None else (0, 0)
 
     def result(self, board, action):
         """
@@ -148,9 +152,7 @@ class MyAI():
         action_arr = []
 
         for plane_i in range(4):
-            print("Plane i :", plane_i)
             for row_i in range(4):
-                print("Row i :", row_i)
                 for space_i in range(4):
                     if board[plane_i][row_i][space_i] == 0 and (
                         plane_i == 0 or board[plane_i - 1][row_i][space_i] != 0
