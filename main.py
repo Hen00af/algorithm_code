@@ -106,8 +106,11 @@ class MyAI:
         action_arr = []
         for y in range(4):
             for x in range(4):
-                if board[x][y][3] == 0:  # 一番上が空なら合法
-                    action_arr.append((x, y))
+                # その列で一番下から探して、まだ空いてるなら候補に追加
+                for z in range(4):
+                    if board[x][y][z] == 0:
+                        action_arr.append((x, y))
+                        break  # 1列につき1回だけ追加
         return action_arr
 
     def alpha_beta_minimax(self, board, isMaximiser, depth, max_depth, alpha, beta):
