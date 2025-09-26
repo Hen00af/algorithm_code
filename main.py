@@ -85,50 +85,42 @@ class MyAI:
 
         return (0, False)
 
-    def evaluate(self, board):
-        end_value, over = self.is_terminal(board)
-        if over:
-            return end_value * 10000  # 終局は最優先
+    def get_move(self, board, player, last_move):
+        self.player = player
+        best_score = -math.inf
+        best_move = (0, 0)
 
-        enemy = 1 if self.player == 2 else 2
-        score = 0
+        moves = self.legal_move(board)
 
-        for line in self.lines:
-            values = [board[x][y][z] for (x, y, z) in line]
+        for move in moves:
+            # zは不要なので result は自分で実装せず、evaluateに直接渡してもOK
+            new_board = self.simulate_move(board, move, self.player)
 
-            # 自分の勝ち筋
-            if values.count(self.player) == 3 and values.count(0) == 1:
-                score += 500
-            elif values.count(self.player) == 2 and values.count(0) == 2:
-                score += 10
+            end_value, over = self.is_terminal(new_board)
+            if over and end_value == 1:
+                return move
 
-            # 相手の勝ち筋
-            if values.count(enemy) == 3 and values.count(0) == 1:
-                score -= 1000
-            elif values.count(enemy) == 2 and values.count(0) == 2:
-                score -= 50
+            current = self.alpha_beta_minimax(new_board, False, 1, 3, -math.inf, math.inf)
 
-        # --- 中心ボーナス ---
-        center_coords = [(1,1), (1,2), (2,1), (2,2)]
-        for z in range(4):
-            for (cx, cy) in center_coords:
-                if board[cx][cy][z] == self.player:
-                    score += 30   # 中心マスは強く評価
-                elif board[cx][cy][z] == enemy:
-                    score -= 20   # 相手が取ってると不利
+            if current > best_score:
+                best_score = current
+                best_move = move
 
-        return score
+        return best_move
+
 
     def legal_move(self, board):
+        """
+        zはフレームワーク側で自動処理されるので (x,y) だけ見ればいい
+        """
         action_arr = []
-        for plane_i in range(4):
-            for row_i in range(4):
-                for space_i in range(4):
-                    if board[plane_i][row_i][space_i] == 0 and (
-                        plane_i == 0 or board[plane_i - 1][row_i][space_i] != 0
-                    ):
-                        action_arr.append((plane_i, row_i, space_i))
+        for y in range(4):
+            for x in range(4):
+                # 一番上のセルが空いていれば、この列は合法手
+                if board[x][y][3] == 0:
+                    action_arr.append((x, y))
         return action_arr
+
 
     def alpha_beta_minimax(self, board, isMaximiser, depth, max_depth, alpha, beta):
         end_value, over = self.is_terminal(board)
