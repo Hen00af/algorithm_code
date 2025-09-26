@@ -1,9 +1,9 @@
 from typing import List, Tuple
 #from local_driver import Alg3D, Board # ローカル検証用
-# from framework import Alg3D, Board # 本番用
+from framework import Alg3D, Board # 本番用
 import math
 
-class MyAI():
+class MyAI(Alg3D):
     def __init__(self):
         # all possible winning lines
         self.lines = self.generate_lines()
@@ -12,35 +12,55 @@ class MyAI():
         self.player = 0
         self.end_value = 0 # 1 if win -1 if lose 0 if
     
-    def get_move(self, board, player, last_move):
-        self.player = player
-        best_score = -math.inf
-        best_move = None
+    def get_move(
+        self,
+        board: List[List[List[int]]], # 盤面情報
+        player: int, # 先手(黒):1 後手(白):2
+        last_move: Tuple[int, int, int] # 直前に置かれた場所(x, y, z)
+    ) -> Tuple[int, int]:
+        try:
+            self.player = player
+            best_score = -math.inf
+            best_move = None
 
-        legal_moves = self.legal_move(board)
-        if not legal_moves:  # No legal moves available
-            return (0, 0)
+            legal_moves = self.legal_move(board)
+            if not legal_moves:  # No legal moves available
+                return (0, 0)
 
-        for action in legal_moves:
-            new_board = self.result(board, action)
+            for action in legal_moves:
+                new_board = self.result(board, action)
 
-            if self.is_terminal(new_board) and self.end_value == 1:
+                # Check for immediate win
+                if self.is_terminal(new_board) and self.end_value == 1:
+                    return (action[1], action[2])
+
+                # Evaluate using minimax
+                current = self.alpha_beta_minimax(
+                    new_board,
+                    False,
+                    1,  
+                    2,  # 深度を3から2に減らして安全性を向上
+                    alpha=-math.inf,
+                    beta=math.inf
+                )
+
+                if current > best_score:
+                    best_score = current
+                    best_move = (action[1], action[2])
+
+            return best_move if best_move is not None else (0, 0)
+        except Exception as e:
+            # エラーが発生した場合はフォールバック
+            legal_moves = self.legal_move(board)
+            if legal_moves:
+                # 中央に近い手を優先
+                center_moves = [action for action in legal_moves if action[1] in [1, 2] and action[2] in [1, 2]]
+                if center_moves:
+                    action = center_moves[0]
+                else:
+                    action = legal_moves[0]  # 最初の有効な手を返す
                 return (action[1], action[2])
-
-            current = self.alpha_beta_minimax(
-                new_board,
-                False,
-                1,  
-                3,
-                alpha=-math.inf,
-                beta=math.inf
-            )
-
-            if current > best_score:
-                best_score = current
-                best_move = (action[1], action[2])
-
-        return best_move if best_move is not None else (0, 0)
+            return (0, 0)
 
     def result(self, board, action):
         """
@@ -125,8 +145,18 @@ class MyAI():
         enemy = 1 if self.player == 2 else 2
         score = 0
 
-        if self.over:
+        # まず終了判定をリセット
+        temp_over = self.over
+        temp_end_value = self.end_value
+        
+        # 終了判定を行う
+        if self.is_terminal(board):
             return self.end_value * 100
+        
+        # 元の状態を復元
+        self.over = temp_over
+        self.end_value = temp_end_value
+        
         # Heuristic scoring
         for line in self.lines:
             # Example line : [(0,0,0), (1,1,1), (2,2,2), (3,3,3)]
@@ -171,8 +201,10 @@ class MyAI():
 
         if isMaximiser:
             max_eval = -math.inf
-            for action in self.legal_move(board):
-                eval = self.alpha_beta_minimax(self.result(board, action), False, depth + 1, max_depth, alpha, beta)
+            legal_actions = self.legal_move(board)
+            for action in legal_actions:
+                new_board = self.result(board, action)
+                eval = self.alpha_beta_minimax(new_board, False, depth + 1, max_depth, alpha, beta)
                 max_eval = max(max_eval, eval)
                 alpha = max(alpha, eval)
                 if beta <= alpha:
@@ -180,12 +212,24 @@ class MyAI():
             return max_eval
         else:
             min_eval = math.inf
-            for action in self.legal_move(board):
-                eval = self.alpha_beta_minimax(self.result(board, action), True, depth + 1, max_depth, alpha, beta)
+            # 敵のプレイヤーのボードを作成
+            legal_actions = self.legal_move(board)
+            original_player = self.player
+            enemy_player = 1 if self.player == 2 else 2
+            
+            for action in legal_actions:
+                # 敵の手を作成
+                import copy
+                new_board = copy.deepcopy(board)
+                new_board[action[0]][action[1]][action[2]] = enemy_player
+                
+                eval = self.alpha_beta_minimax(new_board, True, depth + 1, max_depth, alpha, beta)
                 min_eval = min(min_eval, eval)
                 beta = min(beta, eval)
                 if beta <= alpha:
                     break
+            
+            self.player = original_player  # プレイヤーを復元
             return min_eval
 
 
