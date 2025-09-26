@@ -102,9 +102,9 @@ class MyAI:
                 score += 1
 
             if values.count(enemy) == 3 and values.count(0) == 1:
-                score -= 10
+                score -= 1000
             elif values.count(enemy) == 2 and values.count(0) == 2:
-                score -= 1
+                score -= 10
 
         return score
 
