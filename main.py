@@ -1,145 +1,213 @@
 from typing import List, Tuple
+# from local_driver import Alg3D, Board # ローカル検証用
+from framework import Alg3D, Board # 本番用
 import math
-import copy
-# from local_driver import Alg3D, Board  # ローカル検証用
-from framework import Alg3D, Board  # 本番用
 
 class MyAI(Alg3D):
     def __init__(self):
+        # all possible winning lines
         self.lines = self.generate_lines()
-        self.player = 0  # AI側のプレイヤー番号
+        # check if the game is over
+        self.over = False
+        self.player = 1
+        self.end_value = 0 # 1 if win -1 if lose 0 if
+        self.position_weights = [
+            [  # z = 0
+                [3, 4, 4, 3],
+                [4, 6, 6, 4],
+                [4, 6, 6, 4],
+                [3, 4, 4, 3]
+            ],
+            [  # z = 1
+                [4, 6, 6, 4],
+                [6, 8, 8, 6],
+                [6, 8, 8, 6],
+                [4, 6, 6, 4]
+            ],
+            [  # z = 2
+                [4, 6, 6, 4],
+                [6, 8, 8, 6],
+                [6, 8, 8, 6],
+                [4, 6, 6, 4]
+            ],
+            [  # z = 3
+                [3, 4, 4, 3],
+                [4, 6, 6, 4],
+                [4, 6, 6, 4],
+                [3, 4, 4, 3]
+            ]
+        ]
 
-    # --- 盤面に石をシミュレートして返す ---
-    def simulate_move(self, board, move, player):
-        x, y = move
-        new_board = copy.deepcopy(board)
-        for z in range(4):  # 下から順に置く
-            if new_board[x][y][z] == 0:
-                new_board[x][y][z] = player
-                break
+    
+    def get_move(
+        self,
+        board: List[List[List[int]]], # 盤面情報
+        player: int, # 先手(黒):1 後手(白):2
+        last_move: Tuple[int, int, int] # 直前に置かれた場所(x, y, z)
+    ) -> Tuple[int, int]:
+        # ここにアルゴリズムを書く
+        self.player = player
+        # print("Board state at start of get_move: ", board)
+        # HERE OPTIMISE
+        best_score = -math.inf
+        best_move = (0, 0)
+        # print("Legal moves :", self.legal_move(board))
+        for action in self.legal_move(board):
+            self.over = False
+            self.end_value = 0
+            # print("Action :", action)
+            # if winning move, play it
+            new_board = self.result(board, action)
+            # if self.is_terminal(new_board) and self.end_value == 1:
+            #     return (action[1], action[2])
+            current = self.alpha_beta_minimax(new_board, False, 0, 8, alpha=-math.inf, beta=math.inf)
+            # print("Action :", action, "Score :", current, "\n\n")
+            if current > best_score:
+                best_score = current
+                best_move = (action[1], action[2])
+        # print("Best move :", best_move)
+        return best_move
+
+    def result(self, board, action, isMaximiser=True):
+        """
+            return the board that result from a move
+            board: current board
+            move: (x,y,z) where to play
+            player: which player is playing
+            return new board
+        """ 
+        # Create a deep copy of the board
+        new_board = [[[board[x][y][z] for z in range(4)] for y in range(4)] for x in range(4)]
+        new_board[action[0]][action[1]][action[2]] = self.player if isMaximiser else (1 if self.player == 2 else 2)
         return new_board
 
-    # --- 次の手を決める ---
-    def get_move(self, board: List[List[List[int]]], player: int, 
-                 last_move: Tuple[int, int, int]) -> Tuple[int, int]:
-        try:
-            self.player = player
-            moves = self.legal_move(board)
-            if not moves:
-                return (0, 0)
+    def generate_lines(self):
+        lines = []
+        rng = range(4)
+        for z in rng:
+            for y in rng:
+                lines.append([(x,y,z) for x in rng])
+        for z in rng:
+            for x in rng:
+                lines.append([(x,y,z) for y in rng])
+        for y in rng:
+            for x in rng:
+                lines.append([(x,y,z) for z in rng])
 
-            # 序盤は中央優先
-            occupied = sum(1 for x in range(4) for y in range(4) for z in range(4)
-                           if board[x][y][z] != 0)
-            if occupied < 2 and (1, 1) in moves:
-                return (1, 1)
+        for z in rng:
+            lines.append([(i,i,z) for i in rng])
+            lines.append([(i,3-i,z) for i in rng])
+        for y in rng:
+            lines.append([(i,y,i) for i in rng])
+            lines.append([(i,y,3-i) for i in rng])
+        for x in rng:
+            lines.append([(x,i,i) for i in rng])
+            lines.append([(x,i,3-i) for i in rng])
 
-            enemy = 1 if self.player == 2 else 2
+        # diagonal
+        lines.append([(i,i,i) for i in rng])
+        lines.append([(i,i,3-i) for i in rng])
+        lines.append([(i,3-i,i) for i in rng])
+        lines.append([(3-i,i,i) for i in rng])
+        return lines
 
-            # --- 勝ち手を即決（攻撃優先） ---
-            for move in moves:
-                new_board = self.simulate_move(board, move, self.player)
-                end_value, over = self.is_terminal(new_board, self.player)
-                if over and end_value == 1:
-                    return move
-
-            # --- 敵の勝ち手をブロック（次点） ---
-            for move in moves:
-                new_board = self.simulate_move(board, move, enemy)
-                end_value, over = self.is_terminal(new_board, enemy)
-                if over and end_value == 1:
-                    return move
-
-            # --- αβ探索で最善手 ---
-            best_score = -math.inf
-            best_move = moves[0]
-            for move in moves:
-                new_board = self.simulate_move(board, move, self.player)
-                score = self.alpha_beta_minimax(new_board, False, 1, 2,  # 深度2に削減
-                                                -math.inf, math.inf, enemy)
-                if score > best_score:
-                    best_score = score
-                    best_move = move
-
-            return best_move
-        except Exception:
-            # エラー時は安全な手を返す
-            moves = self.legal_move(board)
-            return moves[0] if moves else (0, 0)
-
-    # --- 勝敗判定（指定プレイヤー基準） ---
-    def is_terminal(self, board, player):
-        enemy = 1 if player == 2 else 2
+    def is_terminal(self, board):
+        """
+            check if the game ended
+            return 1 if ai win -1 if lose and 0 equal
+        """
+        enemy = 1 if self.player == 2 else 2
         for line in self.lines:
-            values = [board[x][y][z] for (x, y, z) in line]
-            if all(val == player for val in values):
-                return (1, True)
-            elif all(val == enemy for val in values):
-                return (-1, True)
-        # 盤面が埋まったら引き分け
-        if all(board[x][y][z] != 0 for x in range(4)
-                                     for y in range(4)
-                                     for z in range(4)):
-            return (0, True)
-        return (0, False)
 
-    # --- 評価関数（AI基準） ---
-    def evaluate(self, board, current_player):
-        end_value, over = self.is_terminal(board, current_player)
-        if over:
-            if end_value == 1:  # current_player 勝ち
-                return 100000000 if current_player == self.player else -1000000
-            elif end_value == -1:  # current_player 負け
-                return -100000000 if current_player == self.player else 1000000
-            else:
-                return 0
 
+            if all(board[x][y][z] == self.player for (x,y,z) in line):
+                self.over = True
+                self.end_value = 1
+                # print("You WIN")
+
+                return True
+            elif all(board[x][y][z] == enemy for (x,y,z) in line):
+                self.over = True
+                self.end_value = -1
+                # print("You lose")
+                return True
+        # if board is full
+        if all(board[3][y][x] != 0 for x in range(4) for y in range(4)):
+            self.over = True
+            self.end_value = 0
+            # print("Draw")
+        return self.over
+
+
+    def evaluate(self, board):
+        """
+            END CONDITION
+            return 100 if ai win -100 if lose and 0 equal
+        """
         enemy = 1 if self.player == 2 else 2
         score = 0
+
+        if self.over:
+            return self.end_value * 1000
+        # Heuristic scoring
         for line in self.lines:
-            values = [board[x][y][z] for (x, y, z) in line]
-
-            # AIの並び（攻撃優先）
+			# Example line : [(0,0,0), (1,1,1), (2,2,2), (3,3,3)]
+			# Example values : [-1, 1, 0, 2]
+            values = [board[x][y][z] for (x,y,z) in line]
+			
             if values.count(self.player) == 3 and values.count(0) == 1:
-                score += 10000
+                score += 100
             elif values.count(self.player) == 2 and values.count(0) == 2:
-                score += 500
-            elif values.count(self.player) == 1 and values.count(0) == 3:
-                score += 50
+                score += 10
 
-            # 敵の並び（守り）
             if values.count(enemy) == 3 and values.count(0) == 1:
-                score -= 800000
+                score -= 100
             elif values.count(enemy) == 2 and values.count(0) == 2:
-                score -= 200
+                score -= 10
+
+        # Position Weight
+        for x in range(4):
+            for y in range(4):
+                for z in range(4):
+                    if board[x][y][z] == self.player:
+                        score += self.position_weights[z][x][y]
+                    elif board[x][y][z] == enemy:
+                        score -= self.position_weights[z][x][y]
+
         return score
 
-    # --- 合法手 ---
     def legal_move(self, board):
+        """
+            use to determine how many legal moves are possible
+        """
         action_arr = []
-        for y in range(4):
-            for x in range(4):
-                # 列が満杯でなければ追加
-                if board[x][y][3] == 0:
-                    action_arr.append((x, y))
+
+        for plane_i in range(4):
+            # print("Plane i :", plane_i)
+            for row_i in range(4):
+                # print("Row i :", row_i)
+                for space_i in range(4):
+                    if board[plane_i][row_i][space_i] == 0 \
+                        and (plane_i == 0 \
+                        or board[plane_i - 1][row_i][space_i] > 0 ):
+
+                        action_arr.append((plane_i, row_i, space_i))
         return action_arr
 
-    # --- αβ探索 ---
-    def alpha_beta_minimax(self, board, isMaximiser, depth, max_depth,
-                           alpha, beta, current_player):
-        end_value, over = self.is_terminal(board, current_player)
-        if over or depth == max_depth:
-            return self.evaluate(board, current_player)
-
-        next_player = 1 if current_player == 2 else 2
+    def alpha_beta_minimax(self, board, isMaximiser, depth, max_depth, alpha, beta):
+        """
+            isMaximiser: is the computer turn to check in the three
+            depth: how far in the three you are
+            max_deth: maximmum depth
+        """
+        if self.is_terminal(board) or depth == max_depth:
+            return self.evaluate(board)
 
         if isMaximiser:
             max_eval = -math.inf
-            for move in self.legal_move(board):
-                new_board = self.simulate_move(board, move, current_player)
-                eval = self.alpha_beta_minimax(new_board, False,
-                                               depth + 1, max_depth,
-                                               alpha, beta, next_player)
+            for action in self.legal_move(board):
+                new_board = self.result(board, action, isMaximiser=True)
+                eval = self.alpha_beta_minimax(new_board, False, depth + 1, max_depth, alpha, beta)
                 max_eval = max(max_eval, eval)
                 alpha = max(alpha, eval)
                 if beta <= alpha:
@@ -147,43 +215,13 @@ class MyAI(Alg3D):
             return max_eval
         else:
             min_eval = math.inf
-            for move in self.legal_move(board):
-                new_board = self.simulate_move(board, move, current_player)
-                eval = self.alpha_beta_minimax(new_board, True,
-                                               depth + 1, max_depth,
-                                               alpha, beta, next_player)
+            for action in self.legal_move(board):
+                new_board = self.result(board, action, isMaximiser=False)
+                eval = self.alpha_beta_minimax(new_board, True, depth + 1, max_depth, alpha, beta)
                 min_eval = min(min_eval, eval)
                 beta = min(beta, eval)
                 if beta <= alpha:
                     break
             return min_eval
 
-    # --- 勝ち筋ラインの事前生成 ---
-    def generate_lines(self):
-        lines = []
-        rng = range(4)
-        # 各方向の直線
-        for z in rng:
-            for y in rng:
-                lines.append([(x, y, z) for x in rng])
-            for x in rng:
-                lines.append([(x, y, z) for y in rng])
-        for y in rng:
-            for x in rng:
-                lines.append([(x, y, z) for z in rng])
-        # 平面の斜め
-        for z in rng:
-            lines.append([(i, i, z) for i in rng])
-            lines.append([(i, 3 - i, z) for i in rng])
-        for y in rng:
-            lines.append([(i, y, i) for i in rng])
-            lines.append([(i, y, 3 - i) for i in rng])
-        for x in rng:
-            lines.append([(x, i, i) for i in rng])
-            lines.append([(x, i, 3 - i) for i in rng])
-        # 3D斜め
-        lines.append([(i, i, i) for i in rng])
-        lines.append([(i, i, 3 - i) for i in rng])
-        lines.append([(i, 3 - i, i) for i in rng])
-        lines.append([(3 - i, i, i) for i in rng])
-        return lines
+
