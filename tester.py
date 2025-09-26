@@ -7,7 +7,7 @@ def main():
     
     ai = MyAI()
     result = ai.get_move(cube, 1, [0, 0, 0])
-
-    print("Result of :", result)  # Expected output:
+    for i in range(4):
+        print("Result of :", result)  # Expected output:
 if __name__ == "__main__":
     main()
