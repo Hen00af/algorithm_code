@@ -1,8 +1,8 @@
-from typing import List, Tuple
-import math
 import copy
+from typing import List, Tuple
+from framework import Alg3D, Board # 本番用
 # from local_driver import Alg3D, Board  # ローカル検証用
-# from framework import Alg3D, Board  # 本番用
+#from local_driver import Alg3D, Board # ローカル検証用
 
 class MyAI(Alg3D):
     def __init__(self):
