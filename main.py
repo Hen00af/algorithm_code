@@ -1,8 +1,10 @@
 from typing import List, Tuple
 import math
 import copy
+# from local_driver import Alg3D, Board  # ローカル検証用
+from framework import Alg3D, Board  # 本番用
 
-class MyAI:
+class MyAI(Alg3D):
     def __init__(self):
         self.lines = self.generate_lines()
         self.player = 0  # AI側のプレイヤー番号
@@ -18,46 +20,52 @@ class MyAI:
         return new_board
 
     # --- 次の手を決める ---
-    def get_move(self, board, player, last_move):
-        self.player = player
-        moves = self.legal_move(board)
-        if not moves:
-            return (0, 0)
+    def get_move(self, board: List[List[List[int]]], player: int, 
+                 last_move: Tuple[int, int, int]) -> Tuple[int, int]:
+        try:
+            self.player = player
+            moves = self.legal_move(board)
+            if not moves:
+                return (0, 0)
 
-        # 序盤は中央優先
-        occupied = sum(1 for x in range(4) for y in range(4) for z in range(4)
-                       if board[x][y][z] != 0)
-        if occupied < 2 and (1, 1) in moves:
-            return (1, 1)
+            # 序盤は中央優先
+            occupied = sum(1 for x in range(4) for y in range(4) for z in range(4)
+                           if board[x][y][z] != 0)
+            if occupied < 2 and (1, 1) in moves:
+                return (1, 1)
 
-        enemy = 1 if self.player == 2 else 2
+            enemy = 1 if self.player == 2 else 2
 
-        # --- 勝ち手を即決（攻撃優先） ---
-        for move in moves:
-            new_board = self.simulate_move(board, move, self.player)
-            end_value, over = self.is_terminal(new_board, self.player)
-            if over and end_value == 1:
-                return move
+            # --- 勝ち手を即決（攻撃優先） ---
+            for move in moves:
+                new_board = self.simulate_move(board, move, self.player)
+                end_value, over = self.is_terminal(new_board, self.player)
+                if over and end_value == 1:
+                    return move
 
-        # --- 敵の勝ち手をブロック（次点） ---
-        for move in moves:
-            new_board = self.simulate_move(board, move, enemy)
-            end_value, over = self.is_terminal(new_board, enemy)
-            if over and end_value == 1:
-                return move
+            # --- 敵の勝ち手をブロック（次点） ---
+            for move in moves:
+                new_board = self.simulate_move(board, move, enemy)
+                end_value, over = self.is_terminal(new_board, enemy)
+                if over and end_value == 1:
+                    return move
 
-        # --- αβ探索で最善手 ---
-        best_score = -math.inf
-        best_move = moves[0]
-        for move in moves:
-            new_board = self.simulate_move(board, move, self.player)
-            score = self.alpha_beta_minimax(new_board, False, 1, 4,
-                                            -math.inf, math.inf, enemy)
-            if score > best_score:
-                best_score = score
-                best_move = move
+            # --- αβ探索で最善手 ---
+            best_score = -math.inf
+            best_move = moves[0]
+            for move in moves:
+                new_board = self.simulate_move(board, move, self.player)
+                score = self.alpha_beta_minimax(new_board, False, 1, 2,  # 深度2に削減
+                                                -math.inf, math.inf, enemy)
+                if score > best_score:
+                    best_score = score
+                    best_move = move
 
-        return best_move
+            return best_move
+        except Exception:
+            # エラー時は安全な手を返す
+            moves = self.legal_move(board)
+            return moves[0] if moves else (0, 0)
 
     # --- 勝敗判定（指定プレイヤー基準） ---
     def is_terminal(self, board, player):
