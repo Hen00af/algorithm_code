@@ -2,7 +2,7 @@ from typing import List, Tuple
 import math
 import copy
 
-class MyAI():
+class MyAI(Alg3D):
     def __init__(self):
         # all possible winning lines
         self.lines = self.generate_lines()
